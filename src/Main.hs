@@ -1,10 +1,11 @@
 module Main where
 
+import System.Console.ANSI
 import Control.Monad (forever, when)
 import Data.Char (toLower)
 import Data.Either
 import Data.Maybe (isJust)
-import Data.List (intersperse)
+import Data.List (intersperse, intercalate)
 import System.Exit (exitSuccess)
 import System.Random (randomRIO)
 import System.IO
@@ -31,6 +32,9 @@ minWordLength = 5
 
 maxWordLength :: Int
 maxWordLength = 9
+
+maxWrongGuesses :: Int
+maxWrongGuesses = 5
 
 freshPuzzle :: String -> Puzzle
 freshPuzzle str = Puzzle str (map (const Nothing) str) []
@@ -76,45 +80,166 @@ fillInCharacter (Puzzle word filledInSoFar s) r@(Right c) = Puzzle word newFille
 
 handleGuess :: Puzzle -> String -> IO Puzzle
 handleGuess puzzle g@[guess] = do
-  putStrLn $ "Your guess was: " ++ g
   case (charInWord puzzle guess, alreadyGuessed puzzle guess) of
     (_, True) -> do
-      putStrLn "You've already guessed that character - try something else!"
+      putStrLn "You've already guessed that character - try another one!"
       return puzzle
     (True, _) -> do
       putStrLn "Great! Let me fill in the blanks..."
       return (fillInCharacter puzzle (Right guess))
     (False, _) -> do
-      putStrLn "This character is not in this word. Try again."
+      putStrLn $ "This word does not contain any " ++ g ++ "'s."
       return (fillInCharacter puzzle (Left guess))
 handleGuess (Puzzle solution filledInSoFar guesses) attempt
   | solution == attempt = return (Puzzle solution (fmap Just solution) guesses)
-  | otherwise = return (Puzzle solution filledInSoFar (Left '_' : guesses))
+  | otherwise = do
+      putStrLn $ attempt ++ " is not the correct word!"
+      return (Puzzle solution filledInSoFar (Left '_' : guesses))
 
 gameOver :: Puzzle -> IO ()
 gameOver (Puzzle wordToGuess _ guessed) =
-  when (length (lefts guessed) > 6) $ do putStrLn "You lost! Sorry!"
-                                         putStrLn $ "The word was: " ++ wordToGuess
-                                         exitSuccess
+  when (length (lefts guessed) > maxWrongGuesses) $ do
+    putStrLn "You lost! Sorry!"
+    putStrLn $ "The word was: " ++ wordToGuess
+    exitSuccess
+
 
 gameWin :: Puzzle -> IO ()
-gameWin (Puzzle _ filledInSoFar _) =
-  when (all isJust filledInSoFar) $ do putStrLn "You won! Good job!!!!"
-                                       exitSuccess
+gameWin (Puzzle guessedWord filledInSoFar _) =
+  when (all isJust filledInSoFar) $ do
+    putStrLn "You won! Good job!!!!"
+    putStrLn $ "The word was: " ++ guessedWord
+    exitSuccess
+
+resetScreen :: IO ()
+resetScreen = do
+  setCursorPosition (length banner) 0
+  clearFromCursorToScreenEnd
+
+clearAllScreen :: IO ()
+clearAllScreen = do
+  clearScreen
+  setCursorPosition 0 0
 
 runGame :: Puzzle -> IO ()
 runGame puzzle = forever $ do
   gameWin puzzle
   gameOver puzzle
+  showAscii $ currentHangedMan puzzle
   putStrLn $ "Current puzzle: " ++ show puzzle
   putStr "Guess a letter: "
   guess <- getLine
+  resetScreen
   handleGuess puzzle guess >>= runGame
+
+-- TODO for the love of god, find a smarter way to do this
+currentHangedMan :: Puzzle -> [String]
+currentHangedMan (Puzzle _ _ guesses) = case length $ lefts guesses of
+  0 -> [ "___________"
+       , "|         |"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "-------------------"
+       ]
+  1 -> [ "___________"
+       , "|         |"
+       , "|         O"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "-------------------"
+       ]
+  2 -> [ "___________"
+       , "|         |"
+       , "|         O"
+       , "|         |"
+       , "|         |"
+       , "|         |"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "-------------------"
+       ]
+  3 -> [ "___________"
+       , "|         |"
+       , "|         O"
+       , "|        /|"
+       , "|       / |"
+       , "|         |"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "-------------------"
+       ]
+  4 -> [ "___________"
+       , "|         |"
+       , "|         O"
+       , "|        /|\\"
+       , "|       / | \\"
+       , "|         |"
+       , "|"
+       , "|"
+       , "|"
+       , "|"
+       , "-------------------"
+       ]
+  5 -> [ "___________"
+       , "|         |"
+       , "|         O"
+       , "|        /|\\"
+       , "|       / | \\"
+       , "|         |"
+       , "|        /"
+       , "|       /"
+       , "|"
+       , "|"
+       , "-------------------"
+       ]
+  6 -> [ "___________"
+       , "|         |"
+       , "|         O"
+       , "|        /|\\"
+       , "|       / | \\"
+       , "|         |"
+       , "|        / \\"
+       , "|       /   \\"
+       , "|"
+       , "|"
+       , "-------------------"
+       ]
+  _ -> []
+
+banner :: [String]
+banner = [ "██╗  ██╗ █████╗ ███╗   ██╗ ██████╗ ███╗   ███╗ █████╗ ███╗   ██╗"
+         , "██║  ██║██╔══██╗████╗  ██║██╔════╝ ████╗ ████║██╔══██╗████╗  ██║"
+         , "███████║███████║██╔██╗ ██║██║  ███╗██╔████╔██║███████║██╔██╗ ██║"
+         , "██╔══██║██╔══██║██║╚██╗██║██║   ██║██║╚██╔╝██║██╔══██║██║╚██╗██║"
+         , "██║  ██║██║  ██║██║ ╚████║╚██████╔╝██║ ╚═╝ ██║██║  ██║██║ ╚████║"
+         , "╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝"
+         ]
+
+showAscii :: [String] -> IO ()
+showAscii = putStrLn . intercalate "\n"
 
 main :: IO ()
 main = do
   hSetBuffering stdout NoBuffering
+  setTitle "Hangman!"
   word <- randomWord'
   let puzzle = freshPuzzle (fmap toLower word)
+  clearAllScreen
+  showAscii banner
   runGame puzzle
 
