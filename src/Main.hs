@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad (forever)
+import Control.Monad (forever, when)
 import Data.Char (toLower)
 import Data.Either
 import Data.Maybe (isJust)
@@ -12,16 +12,19 @@ import System.IO
 newtype WordList = WordList [String]
                    deriving (Eq, Show)
 
--- String: the word to be guessed
--- [Maybe Char]: list of chars that tells you whether or not they have been guessed
--- [Char]: list of guessed chars
+{-|
+   A Puzzle represents all the necessary data for a game of Hangman.
+
+   It contains the word to be guessed, a list of chars that have already been guessed
+   or that are undiscovered yet, and a list of either successful or wrong guesses.
+-}
 data Puzzle =
   Puzzle String [Maybe Char] [Either Char Char]
 
 instance Show Puzzle where
-  show (Puzzle _ discovered guessed) = (intersperse ' ' $ fmap renderPuzzleChar discovered)
+  show (Puzzle _ discovered guessed) = intersperse ' ' (fmap renderPuzzleChar discovered)
                                     ++ "     | guessed so far: "
-                                    ++ (intersperse ' ' $ allGuesses guessed)
+                                    ++ intersperse ' ' (allGuesses guessed)
 
 minWordLength :: Int
 minWordLength = 5
@@ -53,7 +56,7 @@ randomWord' :: IO String
 randomWord' = gameWords >>= randomWord
 
 charInWord :: Puzzle -> Char -> Bool
-charInWord (Puzzle word _ _) char = elem char word
+charInWord (Puzzle word _ _) char = char `elem` word
 
 alreadyGuessed :: Puzzle -> Char -> Bool
 alreadyGuessed (Puzzle _ _ guessed) char = elem char $ allGuesses guessed
@@ -86,22 +89,18 @@ handleGuess puzzle g@[guess] = do
       return (fillInCharacter puzzle (Left guess))
 handleGuess (Puzzle solution filledInSoFar guesses) attempt
   | solution == attempt = return (Puzzle solution (fmap Just solution) guesses)
-  | otherwise = return (Puzzle solution filledInSoFar ((Left '_') : guesses))
+  | otherwise = return (Puzzle solution filledInSoFar (Left '_' : guesses))
 
 gameOver :: Puzzle -> IO ()
 gameOver (Puzzle wordToGuess _ guessed) =
-  if (length $ lefts guessed) > 6
-  then do putStrLn "You lost! Sorry!"
-          putStrLn $ "The word was: " ++ wordToGuess
-          exitSuccess
-  else return ()
+  when (length (lefts guessed) > 6) $ do putStrLn "You lost! Sorry!"
+                                         putStrLn $ "The word was: " ++ wordToGuess
+                                         exitSuccess
 
 gameWin :: Puzzle -> IO ()
 gameWin (Puzzle _ filledInSoFar _) =
-  if all isJust filledInSoFar
-  then do putStrLn "You won! Good job!!!!"
-          exitSuccess
-  else return ()
+  when (all isJust filledInSoFar) $ do putStrLn "You won! Good job!!!!"
+                                       exitSuccess
 
 runGame :: Puzzle -> IO ()
 runGame puzzle = forever $ do
