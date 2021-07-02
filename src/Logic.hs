@@ -64,8 +64,9 @@ handleGuess (Puzzle solution filledInSoFar guesses) attempt
       return (Puzzle solution filledInSoFar (Left '_' : guesses))
 
 gameOver :: Puzzle -> IO ()
-gameOver (Puzzle wordToGuess _ guessed) =
+gameOver puzzle@(Puzzle wordToGuess _ guessed) =
   when (length (lefts guessed) > maxWrongGuesses) $ do
+    showAscii $ currentHangedMan puzzle
     putStrLn "You lost! Sorry!"
     putStrLn $ "The word was: " ++ wordToGuess
     exitSuccess
